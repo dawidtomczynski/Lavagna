@@ -1,0 +1,57 @@
+version: "3.7"
+services:
+  mysqldb:
+    container_name: mysqldb
+    image: mysql:5.7
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      
+# when lavagna-db volume is created for the first time
+# mysql> CREATE DATABASE lavagna CHARACTER SET utf8 COLLATE utf8_bin;
+# mysql> CREATE USER 'test6' IDENTIFIED BY 'test';
+# mysql> GRANT ALL PRIVILEGES lavagna. * TO 'test';
+
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - lavagna-db
+    volumes:
+      - lavagna-db:/var/lib/mysql
+    restart: always
+  app:
+    container_name: app
+    build: .
+    networks:
+      - lavagna-db
+      - lavagna-serv
+    depends_on:
+      mysqldb:
+        condition: service_healthy
+    restart: always
+  nginx:
+    container_name: nginx
+    image: nginx:1.19-alpine
+    volumes:
+       - ./nginx.conf:/etc/nginx/nginx.conf 
+       - ./project/src/main/webapp/:/usr/share/nginx/html/webapp
+    ports:
+      - 80:80
+    networks:
+      - lavagna-serv
+    depends_on:
+      - mysqldb
+      - app
+    restart: always      
+networks:
+  lavagna-db:
+    name: lavagna-db
+    driver: bridge
+  lavagna-serv:
+    name: lavagna-serv
+    driver: bridge
+volumes:
+  lavagna-db:
+    name: lavagna-db
+    driver: local
